@@ -1,3 +1,6 @@
+
+const mongoose = require("mongoose");
+
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -20,5 +23,16 @@ app.get("/api/health", (req, res) => {
     message: "Instagram backend is running",
   });
 });
+
+
+app.get("/api/health/db", (req, res) => {
+  const isConnected = mongoose.connection.readyState === 1;
+
+  res.status(isConnected ? 200 : 503).json({
+    success: isConnected,
+    database: isConnected ? "connected" : "disconnected",
+  });
+});
+
 
 module.exports = app;
