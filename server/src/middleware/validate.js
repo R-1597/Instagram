@@ -82,4 +82,37 @@ function validateLogin(req, res, next) {
   next();
 }
 
-module.exports = { validateRegister,validateLogin, };
+
+
+const profileUpdateSchema = z.object({
+  displayName: z.string().trim().min(1).max(50).optional(),
+  bio: z.string().trim().max(160).optional(),
+  profileImage: z.union([
+    z.string().url().max(2048),
+    z.literal(""),
+  ]).optional(),
+}).strict().refine(
+  (data) => Object.keys(data).length > 0,
+  { message: "Provide at least one profile field to update" }
+);
+
+const validateProfileUpdate = (req, res, next) => {
+  const result = profileUpdateSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid profile data",
+      errors: result.error.issues.map((issue) => ({
+        field: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
+  }
+
+  req.validatedBody = result.data;
+  next();
+};
+
+
+module.exports = { validateRegister,validateLogin,validateProfileUpdate, };
