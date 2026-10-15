@@ -1,5 +1,7 @@
 
 
+const helmet = require("helmet");
+
 const userRoutes = require("./routes/user.routes");
 
 
@@ -16,6 +18,8 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const app = express();
+
+app.use(helmet());
 
 app.use(
   cors({

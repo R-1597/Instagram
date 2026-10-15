@@ -91,7 +91,10 @@ async function login(req, res, next) {
     }
 
     const accessToken = jwt.sign(
-      {},
+      {
+        tokenVersion: user.tokenVersion ?? 0,
+
+      },
       process.env.JWT_SECRET,
       {
         algorithm: "HS256",
@@ -154,11 +157,21 @@ const changePassword = async (req, res) => {
     // await user.save();
 const newPasswordHash = await bcrypt.hash(newPassword, 12);
 
-await User.updateOne(
+const result = await User.updateOne(
   { _id: user._id },
-  { $set: { passwordHash: newPasswordHash } },
+  {
+    $set: { passwordHash: newPasswordHash },
+    $inc: { tokenVersion: 1 },
+  },
   { runValidators: true }
 );
+
+if (result.matchedCount !== 1 || result.modifiedCount !== 1) {
+  return res.status(500).json({
+    success: false,
+    message: "Failed to update password",
+  });
+}
     return res.status(200).json({
       success: true,
       message: "Password changed successfully. Please log in again after your session expires.",

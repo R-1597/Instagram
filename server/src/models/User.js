@@ -47,10 +47,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    tokenVersion: {
+    type: Number,
+    default: 0,
+},
   },
   {
     timestamps: true,
   }
 );
+
+
 
 module.exports = mongoose.model("User", userSchema);
