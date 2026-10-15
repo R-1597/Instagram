@@ -115,4 +115,35 @@ const validateProfileUpdate = (req, res, next) => {
 };
 
 
-module.exports = { validateRegister,validateLogin,validateProfileUpdate, };
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(72),
+  newPassword: z.string().min(8).max(72),
+}).strict().refine(
+  (data) => data.currentPassword !== data.newPassword,
+  {
+    message: "New password must differ from current password",
+    path: ["newPassword"],
+  }
+);
+
+const validateChangePassword = (req, res, next) => {
+  const result = changePasswordSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid password change request",
+      errors: result.error.issues.map((issue) => ({
+        field: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
+  }
+
+  req.validatedBody = result.data;
+  next();
+};
+
+
+module.exports = { validateRegister,validateLogin,validateProfileUpdate,validateChangePassword, };
