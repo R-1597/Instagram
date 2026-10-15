@@ -123,4 +123,54 @@ async function login(req, res, next) {
 }
 
 
-module.exports = { register,login, };
+
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.validatedBody;
+
+    const user = await User.findById(req.userId)
+      .select("+passwordHash");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const matches = await bcrypt.compare(
+      currentPassword,
+      user.passwordHash
+    );
+
+    if (!matches) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    // user.passwordHash = await bcrypt.hash(newPassword, 12);
+    // await user.save();
+const newPasswordHash = await bcrypt.hash(newPassword, 12);
+
+await User.updateOne(
+  { _id: user._id },
+  { $set: { passwordHash: newPasswordHash } },
+  { runValidators: true }
+);
+    return res.status(200).json({
+      success: true,
+      message: "Password changed successfully. Please log in again after your session expires.",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to change password",
+    });
+  }
+};
+
+
+
+module.exports = { register,login,changePassword, };
