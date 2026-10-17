@@ -1,4 +1,8 @@
 
+
+
+const postRoutes = require("./routes/post.routes");
+
 const followRoutes = require("./routes/follow.routes");
 
 const helmet = require("helmet");
@@ -32,6 +36,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/users", followRoutes);
+app.use("/api/posts", postRoutes);
 
 
 
