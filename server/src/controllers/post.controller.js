@@ -3,6 +3,7 @@ const Post = require("../models/Post");
 const User = require("../models/User");
 const cloudinary = require("../config/cloudinary");
 const Follow = require("../models/Follow");
+const Like = require("../models/Like");
 
 
 const createPost = async (req, res, next) => {
@@ -100,12 +101,16 @@ const createPost = async (req, res, next) => {
 };
 
 
+
 const getPostById = async (req, res, next) => {
   try {
     const { postId } = req.params;
 
     if (!mongoose.isValidObjectId(postId)) {
-      return res.status(400).json({ message: "Invalid post ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid post ID",
+      });
     }
 
     const post = await Post.findById(postId).populate(
@@ -114,21 +119,43 @@ const getPostById = async (req, res, next) => {
     );
 
     if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Post not found",
+      });
     }
 
-    return res.status(200).json({ post });
+    const [likeCount, currentUserLike] = await Promise.all([
+      Like.countDocuments({ post: postId }),
+      req.userId
+        ? Like.exists({ post: postId, user: req.userId })
+        : Promise.resolve(null),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      post: {
+        ...post.toObject(),
+        likeCount,
+        isLikedByMe: Boolean(currentUserLike),
+      },
+    });
   } catch (error) {
     next(error);
   }
 };
+
+
 
 const getUserPosts = async (req, res, next) => {
   try {
     const { userId } = req.params;
 
     if (!mongoose.isValidObjectId(userId)) {
-      return res.status(400).json({ message: "Invalid user ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
     }
 
     const page = Number(req.query.page ?? 1);
@@ -142,6 +169,7 @@ const getUserPosts = async (req, res, next) => {
       limit > 50
     ) {
       return res.status(400).json({
+        success: false,
         message: "Page must be positive; limit must be between 1 and 50",
       });
     }
@@ -149,28 +177,72 @@ const getUserPosts = async (req, res, next) => {
     const userExists = await User.exists({ _id: userId });
 
     if (!userExists) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
     const filter = { author: userId };
+    const skip = (page - 1) * limit;
 
     const [posts, totalPosts] = await Promise.all([
       Post.find(filter)
         .populate("author", "username displayName profileImage")
         .sort({ createdAt: -1, _id: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
       Post.countDocuments(filter),
     ]);
 
+    const postIds = posts.map((post) => post._id);
+
+    const [likeCounts, likedPosts] = await Promise.all([
+      Like.aggregate([
+        { $match: { post: { $in: postIds } } },
+        {
+          $group: {
+            _id: "$post",
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+
+      req.userId && postIds.length > 0
+        ? Like.find({
+            user: req.userId,
+            post: { $in: postIds },
+          })
+            .select("post")
+            .lean()
+        : Promise.resolve([]),
+    ]);
+
+    const likeCountMap = new Map(
+      likeCounts.map((item) => [item._id.toString(), item.count])
+    );
+
+    const likedPostIds = new Set(
+      likedPosts.map((like) => like.post.toString())
+    );
+
+    const postsWithLikeInfo = posts.map((post) => ({
+      ...post,
+      likeCount: likeCountMap.get(post._id.toString()) ?? 0,
+      isLikedByMe: likedPostIds.has(post._id.toString()),
+    }));
+
     return res.status(200).json({
-      posts,
+      success: true,
+      posts: postsWithLikeInfo,
       pagination: {
         page,
         limit,
         totalPosts,
         totalPages: Math.ceil(totalPosts / limit),
-        hasNextPage: page * limit < totalPosts,
+        hasNextPage: skip + posts.length < totalPosts,
         hasPreviousPage: page > 1,
       },
     });
@@ -293,6 +365,7 @@ const uploadImage = async (req, res, next) => {
 };
 
 
+
 const getHomeFeed = async (req, res, next) => {
   try {
     const page = Number(req.query.page ?? 1);
@@ -312,9 +385,7 @@ const getHomeFeed = async (req, res, next) => {
       });
     }
 
-    // Global feed: show posts from every user.
     const filter = {};
-
     const skip = (page - 1) * limit;
 
     const [posts, totalPosts] = await Promise.all([
@@ -328,9 +399,46 @@ const getHomeFeed = async (req, res, next) => {
       Post.countDocuments(filter),
     ]);
 
+    const postIds = posts.map((post) => post._id);
+
+    const [likeCounts, likedPosts] = await Promise.all([
+      Like.aggregate([
+        { $match: { post: { $in: postIds } } },
+        {
+          $group: {
+            _id: "$post",
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+
+      req.userId && postIds.length > 0
+        ? Like.find({
+            user: req.userId,
+            post: { $in: postIds },
+          })
+            .select("post")
+            .lean()
+        : Promise.resolve([]),
+    ]);
+
+    const likeCountMap = new Map(
+      likeCounts.map((item) => [item._id.toString(), item.count])
+    );
+
+    const likedPostIds = new Set(
+      likedPosts.map((like) => like.post.toString())
+    );
+
+    const postsWithLikeInfo = posts.map((post) => ({
+      ...post,
+      likeCount: likeCountMap.get(post._id.toString()) ?? 0,
+      isLikedByMe: likedPostIds.has(post._id.toString()),
+    }));
+
     return res.status(200).json({
       success: true,
-      posts,
+      posts: postsWithLikeInfo,
       pagination: {
         page,
         limit,
@@ -344,6 +452,7 @@ const getHomeFeed = async (req, res, next) => {
     next(error);
   }
 };
+
 
 
 const updatePost = async (req, res, next) => {
@@ -418,4 +527,106 @@ const updatePost = async (req, res, next) => {
 };
 
 
-module.exports = { createPost,getPostById,getUserPosts, deletePost, uploadImage, getHomeFeed, updatePost, };
+const likePost = async (req, res, next) => {
+  try {
+    const { postId } = req.params;
+    const userId = req.userId;
+
+    // 1. Validate post ID
+    if (!mongoose.isValidObjectId(postId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid post ID",
+      });
+    }
+
+    // 2. Verify the post exists
+    const postExists = await Post.exists({ _id: postId });
+
+    if (!postExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found",
+      });
+    }
+
+    // 3. Create the like
+    try {
+      await Like.create({
+        post: postId,
+        user: userId,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Post liked successfully",
+        liked: true,
+      });
+    } catch (error) {
+      // The unique index prevents duplicate likes,
+      // including concurrent requests.
+      if (error.code === 11000) {
+        return res.status(200).json({
+          success: true,
+          message: "You have already liked this post",
+          liked: true,
+        });
+      }
+
+      throw error;
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+const unlikePost = async (req, res, next) => {
+  try {
+    const { postId } = req.params;
+    const userId = req.userId;
+
+    // 1. Validate post ID
+    if (!mongoose.isValidObjectId(postId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid post ID",
+      });
+    }
+
+    // 2. Verify the post exists
+    const postExists = await Post.exists({ _id: postId });
+
+    if (!postExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found",
+      });
+    }
+
+    // 3. Remove only this user's like
+    const result = await Like.deleteOne({
+      post: postId,
+      user: userId,
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "You have not liked this post",
+        liked: false,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Post unliked successfully",
+      liked: false,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+module.exports = { createPost, getPostById, getUserPosts, deletePost, uploadImage, getHomeFeed, updatePost, likePost, unlikePost };

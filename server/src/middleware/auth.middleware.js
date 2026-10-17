@@ -72,4 +72,17 @@ async function authenticateToken(req, res, next) {
   }
 }
 
-module.exports = { authenticateToken };
+async function optionalAuthenticateToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  // Guests can continue without authentication.
+  if (!authHeader) {
+    return next();
+  }
+
+  // If credentials are supplied, they must be valid.
+  return authenticateToken(req, res, next);
+}
+
+
+module.exports = { authenticateToken, optionalAuthenticateToken, };
