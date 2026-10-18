@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Follow = require("../models/Follow");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -37,6 +38,19 @@ async function followUser(req, res, next) {
         follower: followerId,
         following: followingId,
       });
+     // NEW: Create a notification for the followed user.
+try {
+  await Notification.create({
+    recipient: followingId,
+    actor: followerId,
+    type: "follow",
+  });
+} catch (notificationError) {
+  console.error(
+    "Follow notification creation failed:",
+    notificationError
+  );
+}
 
       return res.status(201).json({
         success: true,

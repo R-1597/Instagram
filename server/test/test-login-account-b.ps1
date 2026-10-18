@@ -1,10 +1,13 @@
-
+```powershell
 $baseUrl = "http://localhost:5000"
 
 # Account B credentials
 $loginBody = @{
     email    = "followtestb@example.com"
     password = "TestPass123!Secure"
+
+    # email    = "loki@gmail.com"
+    # password = "123456789"
 } | ConvertTo-Json
 
 try {
@@ -20,12 +23,26 @@ try {
         $token = $response.token
     }
 
-    if ($token) {
-        Write-Host "PASS: Account B login successful." -ForegroundColor Green
-        Write-Host "Access token received. Length: $($token.Length)"
+    if (-not $token) {
+        $token = $response.data.accessToken
+    }
 
-        # Keep the token available in this PowerShell session
-        $global:accountBToken = $token
+    if (-not $token) {
+        $token = $response.data.token
+    }
+
+    if ($token) {
+        Write-Host "`nPASS: Account B login successful." -ForegroundColor Green
+
+        # Display the token so you can copy it
+        Write-Host "`nAccess Token:" -ForegroundColor Cyan
+        Write-Host $token
+
+        # Copy the token to the clipboard
+        Set-Clipboard -Value $token
+
+        Write-Host "`nPASS: Token copied to clipboard." -ForegroundColor Green
+        Write-Host "Paste it wherever needed using Ctrl+V."
     }
     else {
         Write-Host "FAIL: Login response contains no access token." -ForegroundColor Red
@@ -42,3 +59,4 @@ catch {
         Write-Host $_.Exception.Message
     }
 }
+```
