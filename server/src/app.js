@@ -1,5 +1,8 @@
 
+const notificationRoutes = require("./routes/notification.routes");
 
+
+const commentRoutes = require("./routes/comment.routes");
 
 const postRoutes = require("./routes/post.routes");
 
@@ -37,6 +40,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/users", followRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/posts", commentRoutes);
+app.use("/api/notifications", notificationRoutes);
+
 
 
 
