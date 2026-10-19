@@ -1,31 +1,21 @@
 
 const notificationRoutes = require("./routes/notification.routes");
-
-
 const commentRoutes = require("./routes/comment.routes");
-
 const postRoutes = require("./routes/post.routes");
-
 const followRoutes = require("./routes/follow.routes");
-
 const helmet = require("helmet");
-
 const userRoutes = require("./routes/user.routes");
-
-
 const { authenticateToken } = require("./middleware/auth.middleware");
-
 const authRoutes = require("./routes/auth.routes");
-
 const mongoose = require("mongoose");
-
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 
-dotenv.config();
 
 const app = express();
+// dotenv.config();
+dotenv.config({ quiet: true });
 
 app.use(helmet());
 
@@ -44,8 +34,6 @@ app.use("/api/posts", commentRoutes);
 app.use("/api/notifications", notificationRoutes);
 
 
-
-
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -62,7 +50,6 @@ app.get("/api/health/db", (req, res) => {
     database: isConnected ? "connected" : "disconnected",
   });
 });
-
 
 
 app.get("/api/auth/protected", authenticateToken, (req, res) => {

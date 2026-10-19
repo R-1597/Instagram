@@ -37,7 +37,7 @@ const updateCurrentUser = async (req, res) => {
       req.userId,
       { $set: req.validatedBody },
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       }
     );

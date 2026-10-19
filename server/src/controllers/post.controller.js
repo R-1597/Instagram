@@ -505,7 +505,7 @@ const updatePost = async (req, res, next) => {
                 $set: { caption },
             },
             {
-                new: true,
+                returnDocument: "after",
                 runValidators: true,
             }
         ).populate("author", "username displayName profileImage");
