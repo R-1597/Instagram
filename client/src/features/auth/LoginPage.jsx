@@ -6,12 +6,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema } from "./authSchema";
 import { loginUser } from "./authService";
 import AuthField from "./AuthField";
+import { useAuth } from "./AuthContext";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [serverError, setServerError] = useState("");
-
+  const { login } = useAuth();
   const {
     register,
     handleSubmit,
@@ -31,11 +32,8 @@ export default function LoginPage() {
         throw new Error("The server returned an unexpected login response.");
       }
 
-      // Temporary session storage; Stage 2.3 will centralize session state.
-      sessionStorage.setItem("accessToken", data.accessToken);
-      sessionStorage.setItem("user", JSON.stringify(data.user));
-
-      navigate(location.state?.from || "/", { replace: true });
+      login(data);
+navigate(location.state?.from || "/", { replace: true });
     } catch (error) {
       setServerError(
         error.response?.data?.message ||
