@@ -9,31 +9,34 @@ import CreatePostPage from "@/features/posts/CreatePostPage";
 import PlaceholderPage from "@/features/posts/PlaceholderPage";
 import LoginPage from "@/features/auth/LoginPage";
 import RegisterPage from "@/features/auth/RegisterPage";
-
+import RequireAuth from "@/features/auth/RequireAuth";
 
 export const router = createBrowserRouter([
-    {
-        path: "/",
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    path: "/register",
+    element: <RegisterPage />,
+  },
+  {
+    element: <RequireAuth />,
+    children: [
+      {
         element: <AppLayout />,
         children: [
-            { index: true, element: <FeedPage /> },
-            { path: "search", element: <SearchPage /> },
-            { path: "notifications", element: <NotificationsPage /> },
-            { path: "profile", element: <ProfilePage /> },
-            { path: "create", element: <CreatePostPage /> },
-            { path: "explore", element: <PlaceholderPage /> },
-            { path: "reels", element: <PlaceholderPage /> },
-            { path: "messages", element: <PlaceholderPage /> },
-            { path: "settings", element: <PlaceholderPage /> },
-            {
-                path: "/login",
-                element: <LoginPage />,
-            },
-            {
-                path: "/register",
-                element: <RegisterPage />,
-            },
+          { path: "/", element: <FeedPage /> },
+          { path: "/search", element: <SearchPage /> },
+          { path: "/notifications", element: <NotificationsPage /> },
+          { path: "/profile", element: <ProfilePage /> },
+          { path: "/create", element: <CreatePostPage /> },
+          { path: "/explore", element: <PlaceholderPage /> },
+          { path: "/reels", element: <PlaceholderPage /> },
+          { path: "/messages", element: <PlaceholderPage /> },
+          { path: "/settings", element: <PlaceholderPage /> },
         ],
-    },
+      },
+    ],
+  },
 ]);
-
