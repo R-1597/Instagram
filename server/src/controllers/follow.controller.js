@@ -189,9 +189,45 @@ async function getFollowing(req, res, next) {
   }
 }
 
+async function getFollowCounts(req, res, next) {
+  try {
+    const { userId } = req.params;
+
+    if (!isValidId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID.",
+      });
+    }
+
+    const userExists = await User.exists({ _id: userId });
+
+    if (!userExists) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    const [followers, following] = await Promise.all([
+      Follow.countDocuments({ following: userId }),
+      Follow.countDocuments({ follower: userId }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      followers,
+      following,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   followUser,
   unfollowUser,
   getFollowers,
   getFollowing,
+  getFollowCounts,
 };

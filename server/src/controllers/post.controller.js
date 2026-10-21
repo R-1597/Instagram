@@ -5,6 +5,7 @@ const cloudinary = require("../config/cloudinary");
 const Follow = require("../models/Follow");
 const Like = require("../models/Like");
 const Notification = require("../models/Notification");
+const Comment = require("../models/Comment");
 
 
 const createPost = async (req, res, next) => {
@@ -402,7 +403,8 @@ const getHomeFeed = async (req, res, next) => {
 
         const postIds = posts.map((post) => post._id);
 
-        const [likeCounts, likedPosts] = await Promise.all([
+
+        const [likeCounts, likedPosts, commentCounts] = await Promise.all([
             Like.aggregate([
                 { $match: { post: { $in: postIds } } },
                 {
@@ -413,7 +415,7 @@ const getHomeFeed = async (req, res, next) => {
                 },
             ]),
 
-            req.userId && postIds.length > 0
+            postIds.length > 0
                 ? Like.find({
                     user: req.userId,
                     post: { $in: postIds },
@@ -421,6 +423,16 @@ const getHomeFeed = async (req, res, next) => {
                     .select("post")
                     .lean()
                 : Promise.resolve([]),
+
+            Comment.aggregate([
+                { $match: { post: { $in: postIds } } },
+                {
+                    $group: {
+                        _id: "$post",
+                        count: { $sum: 1 },
+                    },
+                },
+            ]),
         ]);
 
         const likeCountMap = new Map(
@@ -430,12 +442,16 @@ const getHomeFeed = async (req, res, next) => {
         const likedPostIds = new Set(
             likedPosts.map((like) => like.post.toString())
         );
+        const commentCountMap = new Map(
+    commentCounts.map((item) => [item._id.toString(), item.count])
+);
 
         const postsWithLikeInfo = posts.map((post) => ({
-            ...post,
-            likeCount: likeCountMap.get(post._id.toString()) ?? 0,
-            isLikedByMe: likedPostIds.has(post._id.toString()),
-        }));
+    ...post,
+    likeCount: likeCountMap.get(post._id.toString()) ?? 0,
+    commentCount: commentCountMap.get(post._id.toString()) ?? 0,
+    isLikedByMe: likedPostIds.has(post._id.toString()),
+}));
 
         return res.status(200).json({
             success: true,
