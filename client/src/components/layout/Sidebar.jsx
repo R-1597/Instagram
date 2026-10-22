@@ -23,11 +23,11 @@ const navigation = [
     { label: "Messages", path: "/messages", icon: MessageCircle },
     { label: "Notifications", path: "/notifications", icon: Heart },
     { label: "Create", path: "/create", icon: PlusSquare },
-    { label: "Profile", path: "/profile", icon: UserRound },
+    { label: "Profile", path: "/profile" },
 ];
 
 export default function Sidebar() {
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
     const navigate = useNavigate();
     function handleLogout() {
         logout();
@@ -59,7 +59,19 @@ export default function Sidebar() {
                             }`
                         }
                     >
-                        <Icon size={23} strokeWidth={1.8} />
+                        {label === "Profile" ? (
+                            user?.profileImage ? (
+                                <img
+                                    src={user.profileImage}
+                                    alt="Your profile"
+                                    className="h-6 w-6 rounded-full object-cover"
+                                />
+                            ) : (
+                                <UserRound size={23} strokeWidth={1.8} />
+                            )
+                        ) : (
+                            <Icon size={23} strokeWidth={1.8} />
+                        )}
                         <span>{label}</span>
                     </NavLink>
                 ))}

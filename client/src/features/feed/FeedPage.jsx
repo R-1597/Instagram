@@ -1,11 +1,12 @@
 
 
-
-
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/features/auth/AuthContext";
+import { getFollowStatus, followUser, unfollowUser, } from "@/features/profiles/profileService";
+import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Heart, MessageCircle, MoreHorizontal } from "lucide-react";
 import { getHomeFeed, likePost, unlikePost } from "./feedService";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CommentsSection from "./CommentsSection";
 
 function formatTime(date) {
@@ -22,6 +23,86 @@ function formatTime(date) {
     if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
 
     return new Date(date).toLocaleDateString();
+}
+
+function PostFollowButton({ authorId }) {
+    const { user } = useAuth();
+    const queryClient = useQueryClient();
+
+    const currentUserId = String(user?.id ?? user?._id ?? "");
+    const targetUserId = String(authorId ?? "");
+
+    const statusQuery = useQuery({
+        queryKey: ["followStatus", targetUserId],
+        queryFn: () => getFollowStatus(targetUserId),
+        enabled: Boolean(
+            targetUserId && currentUserId &&
+            targetUserId !== currentUserId
+        ),
+    });
+
+    const mutation = useMutation({
+        mutationFn: () =>
+            statusQuery.data?.isFollowing
+                ? unfollowUser(targetUserId)
+                : followUser(targetUserId),
+
+        onSuccess: async () => {
+            await Promise.all([
+                queryClient.invalidateQueries({
+                    queryKey: ["followStatus", targetUserId],
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: ["followCounts"],
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: ["followers"],
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: ["following"],
+                }),
+            ]);
+        },
+    });
+
+    if (!targetUserId || targetUserId === currentUserId) {
+        return null;
+    }
+
+    if (statusQuery.isPending) {
+        return (
+            <span className="text-xs text-neutral-400">
+                ...
+            </span>
+        );
+    }
+
+    if (statusQuery.isError) {
+        return (
+            <button
+                type="button"
+                onClick={() => statusQuery.refetch()}
+                className="text-sm font-semibold text-neutral-700"
+            >
+                Retry
+            </button>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate()}
+            className="text-sm font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50"
+        >
+            {mutation.isPending
+                ? "..."
+                : statusQuery.data?.isFollowing
+                    ? "Following"
+                    : "Follow"}
+        </button>
+    );
 }
 
 function PostCard({ post }) {
@@ -88,28 +169,48 @@ function PostCard({ post }) {
     return (
         <article className="mb-8 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
             <header className="flex items-center gap-3 px-4 py-4">
-                {author.profileImage ? (
-                    <img
-                        src={author.profileImage}
-                        alt={`${username}'s profile`}
-                        className="size-10 rounded-full object-cover"
-                    />
-                ) : (
-                    <div className="flex size-10 items-center justify-center rounded-full bg-neutral-100 font-semibold">
-                        {username.charAt(0).toUpperCase()}
-                    </div>
-                )}
+                <Link
+                    to={author._id || author.id
+                        ? `/profile/${author._id || author.id}`
+                        : "/profile"}
+                    aria-label={`View ${username}'s profile`}
+                    className="shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-neutral-400"
+                >
+                    {author.profileImage ? (
+                        <img
+                            src={author.profileImage}
+                            alt={`${username}'s profile`}
+                            className="size-10 rounded-full object-cover"
+                        />
+                    ) : (
+                        <div className="flex size-10 items-center justify-center rounded-full bg-neutral-100 font-semibold">
+                            {username.charAt(0).toUpperCase()}
+                        </div>
+                    )}
+                </Link>
 
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{username}</p>
+                    <Link
+                        to={`/profile/${author._id || author.id}`}
+                        className="block truncate text-sm font-semibold hover:underline"
+                    >
+                        {username}
+                    </Link>
+
                     {displayName !== username && (
-                        <p className="truncate text-xs text-neutral-500">{displayName}</p>
+                        <p className="truncate text-xs text-neutral-500">
+                            {displayName}
+                        </p>
                     )}
                 </div>
+
+                <PostFollowButton authorId={author._id || author.id} />
+
 
                 <span className="text-xs text-neutral-500">
                     {formatTime(post.createdAt)}
                 </span>
+
                 <MoreHorizontal size={21} className="text-neutral-600" />
             </header>
 
@@ -186,7 +287,14 @@ function PostCard({ post }) {
 
                 {post.caption && (
                     <p className="mt-3 whitespace-pre-wrap text-sm leading-6">
-                        <span className="mr-2 font-semibold">{username}</span>
+                        <Link
+                            to={author._id || author.id
+                                ? `/profile/${author._id || author.id}`
+                                : "/profile"}
+                            className="mr-2 font-semibold hover:underline"
+                        >
+                            {username}
+                        </Link>
                         {post.caption}
                     </p>
                 )}
@@ -200,30 +308,74 @@ function PostCard({ post }) {
     );
 }
 
+
 export default function FeedPage() {
+
+    const loadMoreRef = useRef(null);
+
     const {
         data,
         isPending,
         isError,
         error,
         refetch,
-    } = useQuery({
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useInfiniteQuery({
         queryKey: ["homeFeed"],
-        queryFn: () => getHomeFeed(1, 10),
+        initialPageParam: 1,
+        queryFn: ({ pageParam }) => getHomeFeed(pageParam, 10),
+        getNextPageParam: (lastPage) => {
+            if (!lastPage?.pagination?.hasNextPage) {
+                return undefined;
+            }
+
+            return lastPage.pagination.page + 1;
+        },
     });
 
-    const posts = data?.posts ?? [];
+    const posts = data?.pages.flatMap((page) => page.posts ?? []) ?? [];
+
+    useEffect(() => {
+        const sentinel = loadMoreRef.current;
+
+        if (!sentinel || !hasNextPage || isFetchingNextPage) {
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    fetchNextPage();
+                }
+            },
+            {
+                root: null,
+                rootMargin: "300px",
+                threshold: 0,
+            }
+        );
+
+        observer.observe(sentinel);
+
+        return () => observer.disconnect();
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
     return (
         <section className="mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-8">
             <header className="mb-8 flex items-center justify-between md:hidden">
-                <h1 className="font-serif text-2xl font-semibold">InstaSpace</h1>
+                <h1 className="font-serif text-2xl font-semibold">
+                    InstaSpace
+                </h1>
                 <Heart size={24} />
             </header>
 
             <div className="mx-auto max-w-2xl">
                 <div className="mb-8">
-                    <p className="text-sm text-neutral-500">YOUR COMMUNITY</p>
+                    <p className="text-sm text-neutral-500">
+                        YOUR COMMUNITY
+                    </p>
                     <h2 className="mt-2 text-3xl font-semibold tracking-tight">
                         Your daily inspiration.
                     </h2>
@@ -252,7 +404,9 @@ export default function FeedPage() {
                         className="rounded-2xl border border-red-200 p-6 text-center"
                         role="alert"
                     >
-                        <h3 className="font-semibold">Couldn't load your feed</h3>
+                        <h3 className="font-semibold">
+                            Couldn't load your feed
+                        </h3>
                         <p className="mt-2 text-sm text-neutral-600">
                             {error?.response?.data?.message ||
                                 error?.message ||
@@ -273,20 +427,42 @@ export default function FeedPage() {
                         <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-neutral-100">
                             <Camera size={27} />
                         </div>
-                        <h3 className="text-lg font-semibold">Your feed starts here</h3>
+                        <h3 className="text-lg font-semibold">
+                            Your feed starts here
+                        </h3>
                         <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-neutral-500">
-                            No posts yet. Create a post or check back when your community
-                            shares something.
+                            No posts yet. Create a post or check back when
+                            your community shares something.
                         </p>
                     </div>
                 )}
 
-                {!isPending &&
-                    !isError &&
+                {!isError &&
                     posts.map((post) => (
                         <PostCard key={post._id} post={post} />
                     ))}
+
+                {hasNextPage && (
+                    <div
+                        ref={loadMoreRef}
+                        className="flex justify-center py-6"
+                        aria-live="polite"
+                    >
+                        {isFetchingNextPage && (
+                            <p className="text-sm text-neutral-500">
+                                Loading more posts...
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {!hasNextPage && posts.length > 0 && (
+                    <p className="py-6 text-center text-sm text-neutral-400">
+                        You're all caught up.
+                    </p>
+                )}
             </div>
         </section>
     );
 }
+
