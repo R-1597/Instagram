@@ -1,21 +1,27 @@
+
 const express = require("express");
 const router = express.Router();
 
-const authenticateToken =
-  require("../middleware/auth.middleware").authenticateToken;
+const { authenticateToken } = require("../middleware/auth.middleware");
 
 const {
   followUser,
   unfollowUser,
   getFollowers,
   getFollowing,
+  getFollowCounts,
+  getFollowStatus,
 } = require("../controllers/follow.controller");
 
-// Public profile relationship lists
+// Profile relationship information
+router.get("/:userId/counts", getFollowCounts);
+router.get("/:userId/status", authenticateToken, getFollowStatus);
+
+// Relationship lists
 router.get("/:userId/followers", getFollowers);
 router.get("/:userId/following", getFollowing);
 
-// Only the authenticated user can manage their own relationships
+// Follow and unfollow
 router.post("/:userId/follow", authenticateToken, followUser);
 router.delete("/:userId/follow", authenticateToken, unfollowUser);
 

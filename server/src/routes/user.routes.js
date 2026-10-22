@@ -1,5 +1,5 @@
 const express = require("express");
-const { getCurrentUser , updateCurrentUser,} = require("../controllers/user.controller");
+const { getCurrentUser ,getUserProfile, updateCurrentUser,} = require("../controllers/user.controller");
 const { authenticateToken } = require("../middleware/auth.middleware");
 
 const {validateProfileUpdate,} = require("../middleware/validate");
@@ -19,6 +19,7 @@ router.patch(
     validateProfileUpdate,
     updateCurrentUser
 );
+router.get("/:userId", authenticateToken, getUserProfile);
 
 router.get("/:userId/posts", getUserPosts);
 
