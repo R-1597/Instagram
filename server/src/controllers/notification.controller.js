@@ -109,9 +109,42 @@ async function markAllNotificationsRead(req, res, next) {
   }
 }
 
+async function deleteNotification(req, res, next) {
+  try {
+    const { notificationId } = req.params;
+
+    if (!isValidId(notificationId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid notification ID.",
+      });
+    }
+
+    const notification = await Notification.findOneAndDelete({
+      _id: notificationId,
+      recipient: req.userId,
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification deleted successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getNotifications,
   getUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
+  deleteNotification,
 };
