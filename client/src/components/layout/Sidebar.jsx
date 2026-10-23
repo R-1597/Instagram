@@ -17,6 +17,8 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { getUnreadNotificationCount } from "@/features/notifications/notificationService";
 
+
+
 const navigation = [
   { label: "Home", path: "/", icon: Home },
   { label: "Search", path: "/search", icon: Search },
@@ -26,6 +28,7 @@ const navigation = [
   { label: "Notifications", path: "/notifications", icon: Heart },
   { label: "Create", path: "/create", icon: PlusSquare },
   { label: "Profile", path: "/profile" },
+  
 ];
 
 export default function Sidebar() {
