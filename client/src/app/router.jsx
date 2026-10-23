@@ -6,10 +6,13 @@ import SearchPage from "@/features/search/SearchPage";
 import NotificationsPage from "@/features/notifications/NotificationsPage";
 import ProfilePage from "@/features/profiles/ProfilePage";
 import CreatePostPage from "@/features/posts/CreatePostPage";
-import PlaceholderPage from "@/features/posts/PlaceholderPage";
 import LoginPage from "@/features/auth/LoginPage";
 import RegisterPage from "@/features/auth/RegisterPage";
 import RequireAuth from "@/features/auth/RequireAuth";
+import ForgotPasswordPage from "@/features/auth/ForgotPasswordPage";
+import SettingsPage from "@/features/settings/SettingsPage";
+import PlaceholderPage from "@/features/posts/PlaceholderPage";
+
 
 export const router = createBrowserRouter([
     {
@@ -35,9 +38,14 @@ export const router = createBrowserRouter([
                     { path: "/explore", element: <PlaceholderPage /> },
                     { path: "/reels", element: <PlaceholderPage /> },
                     { path: "/messages", element: <PlaceholderPage /> },
-                    { path: "/settings", element: <PlaceholderPage /> },
+                    { path: "/settings", element: <SettingsPage  /> },
                 ],
             },
         ],
     },
+    {
+        path: "/forgot-password",
+        element: <ForgotPasswordPage />,
+    },
+    
 ]);

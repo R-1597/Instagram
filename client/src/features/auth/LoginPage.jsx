@@ -33,12 +33,12 @@ export default function LoginPage() {
       }
 
       login(data);
-navigate(location.state?.from || "/", { replace: true });
+      navigate(location.state?.from || "/", { replace: true });
     } catch (error) {
       setServerError(
         error.response?.data?.message ||
-          error.message ||
-          "Unable to log in. Please try again."
+        error.message ||
+        "Unable to log in. Please try again."
       );
     }
   }
@@ -83,6 +83,14 @@ navigate(location.state?.from || "/", { replace: true });
             registration={register("password")}
             error={errors.password?.message}
           />
+          <div className="flex justify-end">
+            <Link
+              to="/forgot-password"
+              className="text-sm font-medium text-neutral-600 hover:text-neutral-950 hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
 
           <button
             type="submit"
