@@ -11,6 +11,8 @@ const mongoose = require("mongoose");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const messageRoutes = require("./routes/message.routes");
+
 
 
 const app = express();
@@ -35,6 +37,7 @@ app.use("/api/users", followRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/posts", commentRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/messages", messageRoutes);
 
 
 app.get("/api/health", (req, res) => {
