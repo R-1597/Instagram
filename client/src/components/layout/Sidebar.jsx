@@ -17,7 +17,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { getUnreadNotificationCount } from "@/features/notifications/notificationService";
 
-
+import { getUnreadMessageCount } from "@/features/messages/messageService";
 
 const navigation = [
   { label: "Home", path: "/", icon: Home },
@@ -28,14 +28,14 @@ const navigation = [
   { label: "Notifications", path: "/notifications", icon: Heart },
   { label: "Create", path: "/create", icon: PlusSquare },
   { label: "Profile", path: "/profile" },
-  
+
 ];
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  
+
 
   const { data: notificationData } = useQuery({
     queryKey: ["unreadNotificationCount"],
@@ -44,6 +44,15 @@ export default function Sidebar() {
     refetchInterval: 30_000,
     retry: 1,
   });
+  const { data: unreadMessagesData } = useQuery({
+    queryKey: ["unreadMessageCount"],
+    queryFn: getUnreadMessageCount,
+    enabled: Boolean(user),
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+
+  const unreadMessageCount = unreadMessagesData?.unreadCount ?? 0;
 
   // Supports either { count: 3 } or { unreadCount: 3 } responses.
   const unreadCount =
@@ -52,7 +61,8 @@ export default function Sidebar() {
     notificationData?.data?.unreadCount ??
     notificationData?.data?.count ??
     0;
-
+console.log("Unread messages API response:", unreadMessagesData);
+console.log("Unread message count:", unreadMessageCount);
   function handleLogout() {
     logout();
     navigate("/login", { replace: true });
@@ -79,8 +89,7 @@ export default function Sidebar() {
             to={path}
             end={path === "/"}
             className={({ isActive }) =>
-              `flex items-center gap-4 rounded-xl px-3 py-3 transition-colors hover:bg-neutral-100 ${
-                isActive ? "bg-neutral-100 font-semibold" : "font-normal"
+              `flex items-center gap-4 rounded-xl px-3 py-3 transition-colors hover:bg-neutral-100 ${isActive ? "bg-neutral-100 font-semibold" : "font-normal"
               }`
             }
           >
@@ -103,6 +112,19 @@ export default function Sidebar() {
                     className="absolute -right-3 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white"
                   >
                     {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </span>
+            ) : label === "Messages" ? (
+              <span className="relative inline-flex">
+                <Icon size={23} strokeWidth={1.8} />
+
+                {unreadMessageCount > 0 && (
+                  <span
+                    aria-label={`${unreadMessageCount} unread messages`}
+                    className="absolute -right-3 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white"
+                  >
+                    {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
                   </span>
                 )}
               </span>

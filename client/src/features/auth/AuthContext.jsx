@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
-
+import { disconnectSocket } from "@/features/messages/socket";
 const AuthContext = createContext(null);
 
 function readStoredUser() {
@@ -34,6 +34,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+      disconnectSocket();
+
     sessionStorage.removeItem("accessToken");
     sessionStorage.removeItem("user");
     setUser(null);
