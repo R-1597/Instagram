@@ -12,7 +12,7 @@ import RequireAuth from "@/features/auth/RequireAuth";
 import ForgotPasswordPage from "@/features/auth/ForgotPasswordPage";
 import SettingsPage from "@/features/settings/SettingsPage";
 import PlaceholderPage from "@/features/posts/PlaceholderPage";
-
+import MessagesPage from "@/features/messages/MessagesPage";
 
 export const router = createBrowserRouter([
     {
@@ -37,7 +37,7 @@ export const router = createBrowserRouter([
                     { path: "/create", element: <CreatePostPage /> },
                     { path: "/explore", element: <PlaceholderPage /> },
                     { path: "/reels", element: <PlaceholderPage /> },
-                    { path: "/messages", element: <PlaceholderPage /> },
+                    { path: "/messages", element: <MessagesPage  /> },
                     { path: "/settings", element: <SettingsPage  /> },
                 ],
             },

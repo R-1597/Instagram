@@ -1,11 +1,11 @@
 
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LoaderCircle, UserRound, X } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
-import {getCurrentUser,getUserProfile,getUserPosts,getFollowCounts,getFollowers,getFollowing, getFollowStatus, followUser, unfollowUser,} from "./profileService";
-
+import { getCurrentUser, getUserProfile, getUserPosts, getFollowCounts, getFollowers, getFollowing, getFollowStatus, followUser, unfollowUser, } from "./profileService";
+import PostDetailModal from "@/features/posts/PostDetailModal";
 import EditProfileCard from "./EditProfileCard";
 
 function formatCount(value) {
@@ -237,6 +237,7 @@ function RelationshipDialog({
 export default function ProfilePage() {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const { user: authUser } = useAuth();
+    const [selectedPost, setSelectedPost] = useState(null);
     const [activeList, setActiveList] = useState(null);
 
     const { userId: routeUserId } = useParams();
@@ -439,6 +440,7 @@ export default function ProfilePage() {
                             return (
                                 <article
                                     key={post._id}
+                                    onClick={() => setSelectedPost(post)}
                                     className="group relative aspect-square overflow-hidden bg-neutral-100"
                                 >
                                     {media?.url ? (
@@ -488,6 +490,14 @@ export default function ProfilePage() {
                             : counts?.following ?? 0
                     }
                     onClose={() => setActiveList(null)}
+                />
+            )}
+            {selectedPost && (
+                <PostDetailModal
+                    post={selectedPost}
+                    profile={profile}
+                    isOwnProfile={isOwnProfile}
+                    onClose={() => setSelectedPost(null)}
                 />
             )}
         </section>
