@@ -71,14 +71,18 @@ export default function NotificationsPage() {
                         const actorName =
                             actor?.username || actor?.displayName || "Someone";
 
+
                         const message =
                             item.type === "follow"
                                 ? "started following you."
-                                : item.type === "like"
-                                    ? "liked your post."
-                                    : item.type === "comment"
-                                        ? "commented on your post."
-                                        : "interacted with you.";
+                                : item.type === "unfollow"
+                                    ? "unfollowed you."
+                                    : item.type === "like"
+                                        ? "liked your post."
+                                        : item.type === "comment"
+                                            ? "commented on your post."
+                                            : "interacted with you.";
+
 
                         function openActorProfile() {
                             if (actorId) {
