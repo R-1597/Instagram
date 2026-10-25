@@ -38,19 +38,19 @@ async function followUser(req, res, next) {
         follower: followerId,
         following: followingId,
       });
-     // NEW: Create a notification for the followed user.
-try {
-  await Notification.create({
-    recipient: followingId,
-    actor: followerId,
-    type: "follow",
-  });
-} catch (notificationError) {
-  console.error(
-    "Follow notification creation failed:",
-    notificationError
-  );
-}
+      // NEW: Create a notification for the followed user.
+      try {
+        await Notification.create({
+          recipient: followingId,
+          actor: followerId,
+          type: "follow",
+        });
+      } catch (notificationError) {
+        console.error(
+          "Follow notification creation failed:",
+          notificationError
+        );
+      }
 
       return res.status(201).json({
         success: true,
@@ -107,7 +107,19 @@ async function unfollowUser(req, res, next) {
         message: "Follow relationship not found.",
       });
     }
-
+    // Create an unfollow notification for the user being unfollowed.
+    try {
+      await Notification.create({
+        recipient: followingId,
+        actor: followerId,
+        type: "unfollow",
+      });
+    } catch (notificationError) {
+      console.error(
+        "Unfollow notification creation failed:",
+        notificationError
+      );
+    }
     return res.status(200).json({
       success: true,
       message: "User unfollowed successfully.",

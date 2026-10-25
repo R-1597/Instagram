@@ -199,7 +199,7 @@ const getUnreadMessageCount = async (req, res, next) => {
       sender: { $ne: req.userId },
       readAt: null,
       conversation: {
-        $in: await Conversation.distinct(" _id", {
+        $in: await Conversation.distinct("_id", {
           participants: req.userId,
         }),
       },
