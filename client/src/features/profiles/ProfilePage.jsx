@@ -7,6 +7,7 @@ import { useAuth } from "../auth/AuthContext";
 import { getCurrentUser, getUserProfile, getUserPosts, getFollowCounts, getFollowers, getFollowing, getFollowStatus, followUser, unfollowUser, } from "./profileService";
 import PostDetailModal from "@/features/posts/PostDetailModal";
 import EditProfileCard from "./EditProfileCard";
+import ProfileImageModal from "../../components/common/ProfileImageModal";
 
 function formatCount(value) {
     return new Intl.NumberFormat().format(value ?? 0);
@@ -239,6 +240,7 @@ export default function ProfilePage() {
     const { user: authUser } = useAuth();
     const [selectedPost, setSelectedPost] = useState(null);
     const [activeList, setActiveList] = useState(null);
+    const [selectedProfileImage, setSelectedProfileImage] = useState(null);
 
     const { userId: routeUserId } = useParams();
     const isOwnProfile = !routeUserId;
@@ -304,19 +306,23 @@ export default function ProfilePage() {
     return (
         <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
             <header className="flex flex-col gap-6 border-b border-neutral-200 pb-8 sm:flex-row sm:items-center sm:gap-12">
+
                 <div className="flex shrink-0 justify-center sm:w-44">
-                    {profile.profileImage ? (
-                        <img
-                            src={profile.profileImage}
-                            alt={`${profile.username}'s profile`}
-                            className="size-28 rounded-full object-cover sm:size-36"
-                        />
-                    ) : (
-                        <div className="flex size-28 items-center justify-center rounded-full bg-neutral-100 sm:size-36">
-                            <UserRound size={56} strokeWidth={1.3} />
-                        </div>
-                    )}
+                    <img
+                        src={profile.profileImage || "/default-avatar.png"}
+                        alt={`${profile.username}'s profile`}
+                        onClick={() => {
+                            if (profile.profileImage) {
+                                setSelectedProfileImage({
+                                    imageUrl: profile.profileImage,
+                                    username: profile.username,
+                                });
+                            }
+                        }}
+                        className="h-32 w-32 cursor-pointer rounded-full object-cover"
+                    />
                 </div>
+
 
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-4">
@@ -498,6 +504,13 @@ export default function ProfilePage() {
                     profile={profile}
                     isOwnProfile={isOwnProfile}
                     onClose={() => setSelectedPost(null)}
+                />
+            )}
+            {selectedProfileImage && (
+                <ProfileImageModal
+                    imageUrl={selectedProfileImage.imageUrl}
+                    username={selectedProfileImage.username}
+                    onClose={() => setSelectedProfileImage(null)}
                 />
             )}
         </section>
