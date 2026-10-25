@@ -21,14 +21,20 @@ dotenv.config({ quiet: true });
 
 app.use(helmet());
 
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 app.use(
   cors({
-    // origin: process.env.CLIENT_URL || "http://localhost:5173", 
-    origin: "http://localhost:5173",
-     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
 
 app.use(express.json());
 app.use("/api/auth", authRoutes);
