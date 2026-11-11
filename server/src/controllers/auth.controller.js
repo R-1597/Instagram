@@ -1,63 +1,275 @@
 
-
-
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const { sendVerificationEmail } = require("../utils/email.service");
+
 
 
 async function register(req, res, next) {
+  let createdUser;
+
   try {
     const { username, email, password, displayName } = req.body;
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedUsername = username.trim().toLowerCase();
+
     const existingUser = await User.findOne({
-      $or: [{ username }, { email }],
+      $or: [
+        { username: normalizedUsername },
+        { email: normalizedEmail },
+      ],
     });
 
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message: "Username or email is already registered",
+        message: "Username or email is already registered.",
       });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const user = await User.create({
-      username,
-      email,
+    // Email verification can be enabled later through .env.
+    const verificationRequired =
+      process.env.EMAIL_VERIFICATION_REQUIRED === "true";
+
+    // Generate a token only when verification is enabled.
+    const rawToken = verificationRequired
+      ? crypto.randomBytes(32).toString("hex")
+      : null;
+
+    const tokenHash = rawToken
+      ? crypto.createHash("sha256").update(rawToken).digest("hex")
+      : null;
+
+    createdUser = await User.create({
+      username: normalizedUsername,
+      email: normalizedEmail,
       passwordHash,
       displayName: displayName || "",
+
+      // Restore normal registration while verification is disabled.
+      isEmailVerified: !verificationRequired,
+
+      emailVerificationTokenHash: tokenHash,
+      emailVerificationExpires: rawToken
+        ? new Date(Date.now() + 24 * 60 * 60 * 1000)
+        : null,
     });
+
+    // Send email only when mandatory verification is enabled.
+    if (verificationRequired) {
+      if (!process.env.API_BASE_URL) {
+        throw new Error("API_BASE_URL is not configured");
+      }
+
+      const verificationUrl = new URL(
+        "/api/auth/verify-email",
+        process.env.API_BASE_URL
+      );
+
+      verificationUrl.searchParams.set("token", rawToken);
+
+      await sendVerificationEmail({
+        to: normalizedEmail,
+        username: normalizedUsername,
+        verificationUrl: verificationUrl.toString(),
+      });
+    }
 
     return res.status(201).json({
       success: true,
-      message: "Account created successfully",
+      message: verificationRequired
+        ? "Registration received. Check your email and verify your account before logging in."
+        : "Registration successful. You can now log in.",
       user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        displayName: user.displayName,
-        bio: user.bio,
-        profileImage: user.profileImage,
-        createdAt: user.createdAt,
+        id: createdUser._id,
+        username: createdUser.username,
+        email: createdUser.email,
+        displayName: createdUser.displayName,
+        isEmailVerified: !verificationRequired,
       },
     });
   } catch (error) {
-    // A concurrent registration may pass the initial lookup.
-    // The unique MongoDB index remains the final safeguard.
+    // Clean up a pending account if verification email delivery fails.
+    if (createdUser?._id) {
+      try {
+        await User.deleteOne({
+          _id: createdUser._id,
+          isEmailVerified: false,
+        });
+      } catch (cleanupError) {
+        console.error("Pending registration cleanup failed:", cleanupError);
+      }
+    }
+
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Username or email is already registered",
+        message: "Username or email is already registered.",
+      });
+    }
+
+    if (error.message === "Unable to send verification email.") {
+      return res.status(503).json({
+        success: false,
+        message:
+          "We couldn't send the verification email. Please try registering again later.",
       });
     }
 
     next(error);
   }
 }
+
+
+async function verifyEmail(req, res, next) {
+  try {
+    const token = req.query.token;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification token is missing.",
+      });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOneAndUpdate(
+      {
+        emailVerificationTokenHash: tokenHash,
+        emailVerificationExpires: { $gt: new Date() },
+        isEmailVerified: false,
+      },
+      {
+        $set: {
+          isEmailVerified: true,
+          emailVerificationTokenHash: null,
+          emailVerificationExpires: null,
+        },
+      },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid or expired verification link. Request a new one if needed.",
+      });
+    }
+
+    const loginUrl = new URL("/", process.env.CLIENT_URL);
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Email verified successfully! You can now log in to your account.",
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        displayName: user.displayName,
+        isEmailVerified: true,
+      },
+      loginUrl: loginUrl.toString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+async function resendVerificationEmail(req, res, next) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({
+      email: normalizedEmail,
+    }).select("username isEmailVerified");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found with that email address.",
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Your email is already verified. You can log in directly.",
+      });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    const result = await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          emailVerificationTokenHash: tokenHash,
+          emailVerificationExpires: new Date(
+            Date.now() + 24 * 60 * 60 * 1000
+          ),
+        },
+      }
+    );
+
+    if (!result.matchedCount || !result.modifiedCount) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update verification token. Please try again.",
+      });
+    }
+
+    const verificationUrl = new URL(
+      "/api/auth/verify-email",
+      process.env.API_BASE_URL
+    );
+    verificationUrl.searchParams.set("token", rawToken);
+
+    await sendVerificationEmail({
+      to: normalizedEmail,
+      username: user.username,
+      verificationUrl: verificationUrl.toString(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Verification email resent. Check your inbox and verify your account.",
+    });
+  } catch (error) {
+    if (error.message === "Unable to send verification email.") {
+      return res.status(503).json({
+        success: false,
+        message:
+          "We couldn't send the verification email. Please try again later.",
+      });
+    }
+    next(error);
+  }
+}
+
 
 async function login(req, res, next) {
   try {
@@ -67,9 +279,13 @@ async function login(req, res, next) {
       throw new Error("JWT_SECRET is not configured");
     }
 
+    // Normalize email consistently with registration.
+    const normalizedEmail = email.trim().toLowerCase();
+
     // passwordHash uses select: false in the User model.
-    // Explicitly request it for password verification.
-    const user = await User.findOne({ email }).select("+passwordHash");
+    const user = await User.findOne({
+      email: normalizedEmail,
+    }).select("+passwordHash");
 
     if (!user) {
       return res.status(401).json({
@@ -90,10 +306,21 @@ async function login(req, res, next) {
       });
     }
 
+    // Enforce verification only when explicitly enabled.
+    if (
+      process.env.EMAIL_VERIFICATION_REQUIRED === "true" &&
+      !user.isEmailVerified
+    ) {
+      return res.status(403).json({
+        success: false,
+        code: "EMAIL_NOT_VERIFIED",
+        message: "Please verify your email before logging in.",
+      });
+    }
+
     const accessToken = jwt.sign(
       {
         tokenVersion: user.tokenVersion ?? 0,
-
       },
       process.env.JWT_SECRET,
       {
@@ -127,6 +354,7 @@ async function login(req, res, next) {
 
 
 
+
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.validatedBody;
@@ -155,23 +383,23 @@ const changePassword = async (req, res) => {
 
     // user.passwordHash = await bcrypt.hash(newPassword, 12);
     // await user.save();
-const newPasswordHash = await bcrypt.hash(newPassword, 12);
+    const newPasswordHash = await bcrypt.hash(newPassword, 12);
 
-const result = await User.updateOne(
-  { _id: user._id },
-  {
-    $set: { passwordHash: newPasswordHash },
-    $inc: { tokenVersion: 1 },
-  },
-  { runValidators: true }
-);
+    const result = await User.updateOne(
+      { _id: user._id },
+      {
+        $set: { passwordHash: newPasswordHash },
+        $inc: { tokenVersion: 1 },
+      },
+      { runValidators: true }
+    );
 
-if (result.matchedCount !== 1 || result.modifiedCount !== 1) {
-  return res.status(500).json({
-    success: false,
-    message: "Failed to update password",
-  });
-}
+    if (result.matchedCount !== 1 || result.modifiedCount !== 1) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update password",
+      });
+    }
     return res.status(200).json({
       success: true,
       message: "Password changed successfully. Please log in again after your session expires.",
@@ -326,4 +554,4 @@ async function resetPassword(req, res, next) {
 }
 
 
-module.exports = { register,login,changePassword,forgotPassword,resetPassword };
+module.exports = { register, login, changePassword, forgotPassword, resetPassword };
